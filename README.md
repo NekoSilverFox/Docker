@@ -205,7 +205,7 @@ Docker 概念：
 
     通过 `-it` 创建的容器，退出后会立刻关闭
 
-- `-d` 以守护(后台)模式运行容器。创建一个容器在后台运行，需要使用 docker exec 进入容器。**退出后，容器不会关闭**
+- `-d` 以守护(后台)模式运行容器。创建一个容器在后台运行，需要使用 `docker exec` 进入容器。**退出后，容器不会关闭**
 
     通过 `-id` 创建的容器，退出后会**不会**关闭
 
@@ -232,7 +232,7 @@ Docker 概念：
 
 | 命令                                                         | 说明                                                         |
 | ------------------------------------------------------------ | ------------------------------------------------------------ |
-| `docker run -参数 --name=容器自定义名字 IMAGE:TAG /bin/bash` | 创建容器，并让其运行                                         |
+| `docker run -参数 --name=容器自定义名字 IMAGE:TAG /bin/bash` | **创建**容器，并让其运行                                     |
 | `docker pause `                                              | **暂停**容器（挂起进程）                                     |
 | `docker unpause`                                             | 取消暂停容器                                                 |
 | `docker ps -参数`                                            | 查看所有运行容器及其状态                                     |
@@ -252,11 +252,59 @@ Docker 概念：
 
 
 
+# 配置可使用 SSH 的容器
 
+> https://www.cherryservers.com/blog/ssh-into-docker-container
 
+1. 创建 `Dockerfile`
 
+    **注意：**
 
+    - **ubuntu 16.04 可以连接，而 latest 版本连不上。需要使用其他办法连接**
+    - 要把以下文件中的密码 `YOUR_PASSWORD` 改成自己的
 
+    ```dockerfile
+    FROM ubuntu:16.04
+    RUN apt-get update && apt-get install -y openssh-server
+    RUN mkdir /var/run/sshd
+    
+    # Set root password for SSH access (change 'YOUR_PASSWORD' to your desired password)
+    RUN echo 'root:YOUR_PASSWORD' | chpasswd
+    RUN sed -i 's/PermitRootLogin prohibit-password/PermitRootLogin yes/' /etc/ssh/sshd_config
+    RUN sed 's@session\s*required\s*pam_loginuid.so@session optional pam_loginuid.so@g' -i /etc/pam.d/sshd
+    EXPOSE 22
+    CMD ["/usr/sbin/sshd", "-D"]
+    ```
+
+    - `FROM ubuntu:16.04`：将标准的 Ubuntu 16.04 镜像（可以在 Docker Hub 上找到）作为我们自定义 Docker 镜像的基础镜像。接下来的指令将在此基础镜像上构建。
+
+    - `RUN apt-get update && apt-get install -y openssh-server`：该命令更新容器内的包索引并安装 OpenSSH-server 包，这是 SSH 服务器功能所需的。
+
+    - `RUN mkdir /var/run/sshd`：用于在容器内部设置目录 `/var/run/sshd`。SSH 守护进程需要此目录才能正常运行。
+
+    - `RUN echo 'root:your_password' | chpasswd`：在容器内部设置 root 用户的密码。将 `'your_password'` 替换为你想要的密码。
+
+    - `RUN sed -i 's/PermitRootLogin prohibit-password/PermitRootLogin yes/' /etc/ssh/sshd_config`：修改 `sshd_config` 文件以启用 root 密码登录，这意味着允许 "root" 用户使用密码登录，而不是依赖 SSH 密钥等其他认证方法。
+
+    - `RUN sed 's@session\s*required\s*pam_loginuid.so@session optional pam_loginuid.so@g' -i /etc/pam.d/sshd`：修改 SSH 守护进程的可插拔认证模块配置，以防止与 systemd 可能出现的问题。
+
+    - `EXPOSE 22`：在容器中暴露端口 22，允许对容器内运行的 SSH 服务器进行 SSH 连接。
+
+    - `CMD ["/usr/sbin/sshd", "-D"]`：指定从此镜像启动容器时运行的默认命令。在这种情况下，它以前台模式启动 SSH 守护进程，并使用 `-D` 选项，允许容器在 SSH 服务器活动时保持运行。
+
+        
+
+2. 通过  `Dockerfile` 构建镜像，然后创建并运行容器
+
+    ```bash
+    docker build -t 镜像名字 .
+    docker run -id -p 主机端口:22 --name 容器名 镜像名
+    docker start 容器名
+    ```
+
+    
+
+3. 使用 SSH 工具进行连接
 
 
 
